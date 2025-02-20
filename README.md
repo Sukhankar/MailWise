@@ -2,7 +2,7 @@
 
 MailWise is a Chrome extension that integrates seamlessly with Gmail to generate AI-powered email replies, saving time and enhancing productivity. 🚀
 
-##Download the extension 🔗 https://microsoftedge.microsoft.com/addons/detail/replywise/mnolfmlcjobggbncpedngnkfplojjflj
+#Download the extension 🔗 https://microsoftedge.microsoft.com/addons/detail/replywise/mnolfmlcjobggbncpedngnkfplojjflj
 
 ## 🛠️ Setup and Installation
 
