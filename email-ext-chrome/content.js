@@ -1,82 +1,79 @@
-console.log("Hello from email-ext-chrome/content.js");
-
-function findComposeToolbar() {
-    const selectors = [
-        '.btC', 
-        '.aDh',
-        '[role="toolbar"]',
-        '.gU.Up',
-    ];
-    for(const selector of selectors) {
-        const toolbar = document.querySelector(selector);
-        if(toolbar) {
-            return toolbar;
-        } 
-        return null;
-}
-}
+console.log("Email Writer Extension - Content Script Loaded");
 
 function createAIButton() {
-    const button = document.createElement('div');
-    button.className = 'T-I J-J5-Ji aoO T-I-atl L3';
-    button.style.marginRight = '8px';
-    button.innerHTML = `AI Reply`;
-    button.setAttribute('role', 'button');
-    button.setAttribute('data-tooltip', 'Generate AI Reply');
-    return button;
+   const button = document.createElement('div');
+   button.className = 'T-I J-J5-Ji aoO v7 T-I-atl L3';
+   button.style.marginRight = '8px';
+   button.innerHTML = 'AI Reply';
+   button.setAttribute('role', 'button');
+   button.setAttribute('data-tooltip', 'Generate AI Reply');
+   return button;
 }
-function getEmailContent() {
-    const selectors = [
-        '.h7',
-        '.a3s.aiL',
-        '.gmail_quote',
-        '[role="presentation"]'
-    ];
+
+function getEmailContent(isReply) {
+    if (!isReply) {
+        // Composing a new email → Use structured prompt + subject
+        const subjectElement = document.querySelector('input[name="subjectbox"]');
+        if (subjectElement) {
+            const subject = subjectElement.value.trim();
+            if (subject) {
+                return `Write a professional email regarding: "${subject}". The email should be well-structured, starting with a proper salutation, clearly stating the purpose, and ending with a closing remark.`;
+            }
+        }
+        return 'Write a professional email with a clear purpose, details, and closing statement.';
+    }
+
+    // Replying to an email → Use email content only
+    const selectors = ['.h7', '.a3s.aiL', '.gmail_quote', '[role="presentation"]'];
     for (const selector of selectors) {
         const content = document.querySelector(selector);
         if (content) {
             return content.innerText.trim();
         }
-        return '';
     }
+    return '';
 }
 
+function findComposeToolbar() {
+    const selectors = ['.btC', '.aDh', '[role="toolbar"]', '.gU.Up'];
+    for (const selector of selectors) {
+        const toolbar = document.querySelector(selector);
+        if (toolbar) {
+            return toolbar;
+        }
+    }
+    return null;
+}
 
-function injectButton(){
+function injectButton() {
     const existingButton = document.querySelector('.ai-reply-button');
-    if(existingButton) existingButton.remove();
+    if (existingButton) existingButton.remove();
 
     const toolbar = findComposeToolbar();
-
-    if(!toolbar) {
-        console.log("Compose toolbar not found");
+    if (!toolbar) {
+        console.log("Toolbar not found");
         return;
-    };
-    console.log("Compose toolbar found");
+    }
 
+    console.log("Toolbar found, creating AI button");
     const button = createAIButton();
-    button.childList.add('ai-reply-button'); 
+    button.classList.add('ai-reply-button');
 
     button.addEventListener('click', async () => {
         try {
             button.innerHTML = 'Generating...';
             button.disabled = true;
 
-            const emailContent = getEmailContent();
-            const response = await fetch('http://localhost:8080/api/email/generate', {
+            const isReply = !!document.querySelector('.gmail_quote, .h7, .a3s.aiL');
+            const emailContent = getEmailContent(isReply);
+
+            const response = await fetch('https://demo-deployment-latest-9em1.onrender.com/api/email/generate', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    emailContent: emailContent,
-                    tone: "professional"
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ emailContent, tone: "professional" })
             });
 
-            if (!response.ok) {
-                throw new Error('API Request Failed');
-            }
+            if (!response.ok) throw new Error('API Request Failed');
 
             const generatedReply = await response.text();
             const composeBox = document.querySelector('[role="textbox"][g_editable="true"]');
@@ -92,31 +89,26 @@ function injectButton(){
             alert('Failed to generate reply');
         } finally {
             button.innerHTML = 'AI Reply';
-            button.disabled =  false;
+            button.disabled = false;
         }
     });
-   
+
     toolbar.insertBefore(button, toolbar.firstChild);
 }
 
-const observer = new MutationObserver((mutations) => {   
-    for(const mutation of mutations) {
-       const  addedNodes  = Array.from(mutation.addedNodes);
-       const hasComposeElement = addedNodes.some(node => node.nodeType === Node.ELEMENT_NODE &&
-        (node.matches('.aDh, .btC, [role="dialog"]')|| node.querySelector('.aDh, .btC, [role="dialog"]'))
+const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+        const addedNodes = Array.from(mutation.addedNodes);
+        const hasComposeElements = addedNodes.some(node =>
+            node.nodeType === Node.ELEMENT_NODE &&
+            (node.matches('.aDh, .btC, [role="dialog"]') || node.querySelector('.aDh, .btC, [role="dialog"]'))
         );
 
-        if(hasComposeElement) {
-            console.log("Compose element found");
+        if (hasComposeElements) {
+            console.log("Compose Window Detected");
             setTimeout(injectButton, 500);
-            
         }
-
     }
 });
 
-
-observer.observe(document.body, {
-    childList: true,
-    subtree: true
-})
+observer.observe(document.body, { childList: true, subtree: true });
